@@ -1,8 +1,11 @@
 // src/components/Presupuesto.jsx
 import { useState, useEffect } from 'react';
-import sha256 from 'crypto-js/sha256'; // Seguridad
+import sha256 from 'crypto-js/sha256';
+// Librerías para PDF
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
-// --- FORMULARIO SIMPLE ---
+// --- FORMULARIO ---
 const FormularioGasto = ({
   nombreGasto,
   setNombreGasto,
@@ -24,7 +27,6 @@ const FormularioGasto = ({
         ¿Qué compraste?
       </h3>
     </div>
-
     <input
       type="text"
       placeholder="Ej: Arroz, Aceite..."
@@ -33,7 +35,6 @@ const FormularioGasto = ({
       className="w-full p-4 text-lg bg-gray-50 dark:bg-gray-700 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-300 dark:text-white transition"
       required
     />
-
     <div className="grid grid-cols-3 gap-2">
       <input
         type="number"
@@ -62,7 +63,6 @@ const FormularioGasto = ({
         required
       />
     </div>
-
     <button
       type="submit"
       className="w-full bg-indigo-600 text-white p-5 text-xl rounded-2xl font-bold hover:bg-indigo-700 transition shadow-lg active:scale-95 mt-4"
@@ -72,12 +72,9 @@ const FormularioGasto = ({
   </form>
 );
 
-// --- COMPONENTE PRINCIPAL ---
+// --- MAIN ---
 export default function Presupuesto() {
-  // --- FECHA DINÁMICA (Se actualiza sola) ---
-  const currentYear = new Date().getFullYear(); // Esto tomará el año de tu dispositivo (2026, 2027, etc.)
-
-  // --- ESTADOS ---
+  const currentYear = new Date().getFullYear();
   const [isDark, setIsDark] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -86,21 +83,16 @@ export default function Presupuesto() {
   }, []);
 
   const toggleDarkMode = () => {
-    if (isDark) {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-      setIsDark(false);
-    } else {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-      setIsDark(true);
-    }
+    if (isDark) document.documentElement.classList.remove('dark');
+    else document.documentElement.classList.add('dark');
+    localStorage.setItem('theme', isDark ? 'light' : 'dark');
+    setIsDark(!isDark);
   };
 
   const leerStorage = (clave, valorPorDefecto) => {
     try {
-      const guardado = localStorage.getItem(clave);
-      return guardado ? JSON.parse(guardado) : valorPorDefecto;
+      const g = localStorage.getItem(clave);
+      return g ? JSON.parse(g) : valorPorDefecto;
     } catch (e) {
       return valorPorDefecto;
     }
@@ -119,16 +111,29 @@ export default function Presupuesto() {
   const [salario, setSalario] = useState(() => leerStorage('salario', 0));
   const [gastos, setGastos] = useState(() => leerStorage('gastos', []));
   const [inputSalario, setInputSalario] = useState('');
-
   const [nombreGasto, setNombreGasto] = useState('');
   const [peso, setPeso] = useState('');
   const [unidad, setUnidad] = useState('lbs');
   const [costo, setCosto] = useState('');
 
-  // --- LÓGICA SEGURA ---
+  const olvidarPin = () => {
+    if (
+      window.confirm(
+        '⚠️ Se borrarán todos los datos para recuperar el acceso. ¿Continuar?',
+      )
+    ) {
+      localStorage.clear();
+      setPinGuardado(null);
+      setCreandoPin(true);
+      setErrorPin(false);
+      setPinInput('');
+      setSalario(0);
+      setGastos([]);
+    }
+  };
+
   const verificarPin = () => {
-    const hashedInput = sha256(pinInput).toString();
-    if (hashedInput === pinGuardado) {
+    if (sha256(pinInput).toString() === pinGuardado) {
       setIsUnlocked(true);
       setErrorPin(false);
       setPinInput('');
@@ -136,56 +141,49 @@ export default function Presupuesto() {
       setErrorPin(true);
     }
   };
-
   const crearPin = () => {
     if (pinInput.length >= 4) {
-      const hashedPin = sha256(pinInput).toString();
-      localStorage.setItem('app_pin', hashedPin);
-      setPinGuardado(hashedPin);
+      const h = sha256(pinInput).toString();
+      localStorage.setItem('app_pin', h);
+      setPinGuardado(h);
       setIsUnlocked(true);
       setCreandoPin(false);
     } else {
-      alert('El PIN debe tener al menos 4 números');
+      alert('Mínimo 4 números');
     }
   };
-
   const guardarSalario = () => {
-    const numero = Number(inputSalario);
-    if (numero > 0) {
-      setSalario(numero);
-      localStorage.setItem('salario', String(numero));
+    const n = Number(inputSalario);
+    if (n > 0) {
+      setSalario(n);
+      localStorage.setItem('salario', String(n));
       setInputSalario('');
     }
   };
-
   const agregarGasto = e => {
     e.preventDefault();
     if (!nombreGasto || !costo) return;
-    const nuevoGasto = {
+    const ng = {
       id: Date.now(),
       nombre: nombreGasto,
       peso,
       unidad,
       costo: Number(costo),
     };
-    const nuevosGastos = [nuevoGasto, ...gastos];
-    setGastos(nuevosGastos);
-    localStorage.setItem('gastos', JSON.stringify(nuevosGastos));
+    setGastos([ng, ...gastos]);
+    localStorage.setItem('gastos', JSON.stringify([ng, ...gastos]));
     setNombreGasto('');
     setPeso('');
     setCosto('');
-    setUnidad('lbs');
     setIsModalOpen(false);
   };
-
   const eliminarGasto = id => {
-    const nuevosGastos = gastos.filter(g => g.id !== id);
-    setGastos(nuevosGastos);
-    localStorage.setItem('gastos', JSON.stringify(nuevosGastos));
+    const n = gastos.filter(g => g.id !== id);
+    setGastos(n);
+    localStorage.setItem('gastos', JSON.stringify(n));
   };
-
   const reiniciarApp = () => {
-    if (window.confirm('¿Borrar todo y empezar de nuevo?')) {
+    if (window.confirm('¿Borrar todo?')) {
       localStorage.clear();
       setSalario(0);
       setGastos([]);
@@ -195,7 +193,63 @@ export default function Presupuesto() {
     }
   };
 
-  // --- PANTALLA DE BLOQUEO ---
+  // --- FUNCIÓN GENERAR PDF ---
+  const generarPDF = () => {
+    const doc = new jsPDF();
+    const totalG = gastos.reduce((acc, g) => acc + (Number(g.costo) || 0), 0);
+
+    // Título y Encabezado
+    doc.setFontSize(22);
+    doc.setTextColor(79, 70, 229); // Color Indigo
+    doc.text('FinanzaPro - Resumen de Gastos', 14, 22);
+
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(
+      `Generado el: ${new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`,
+      14,
+      30,
+    );
+
+    // Resumen Financiero
+    doc.setFontSize(12);
+    doc.setTextColor(0);
+    doc.text(`Salario Inicial: $${salario.toLocaleString('es-ES')}`, 14, 45);
+    doc.setTextColor(220, 38, 38); // Rojo
+    doc.text(`Total Gastado: $${totalG.toLocaleString('es-ES')}`, 14, 52);
+    const restanteVal = salario - totalG;
+    doc.setTextColor(22, 163, 74); // Verde
+    doc.text(`Disponible: $${restanteVal.toLocaleString('es-ES')}`, 14, 59);
+
+    // Tabla de Gastos
+    doc.autoTable({
+      startY: 70,
+      head: [['Producto', 'Cantidad', 'Costo']],
+      body: gastos.map(g => [
+        g.nombre,
+        g.peso ? `${g.peso} ${g.unidad}` : '-',
+        `$${(Number(g.costo) || 0).toLocaleString('es-ES')}`,
+      ]),
+      theme: 'striped',
+      headStyles: { fillColor: [79, 70, 229] }, // Indigo
+    });
+
+    // Pie de página del PDF
+    const pageHeight =
+      doc.internal.pageSize.height || doc.internal.pageSize.getHeight();
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.text(
+      'FinanzaPro © ' + currentYear + ' - Documento generado automáticamente.',
+      14,
+      pageHeight - 10,
+    );
+
+    // Descargar
+    doc.save(`MisGastos_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
+  // --- LOCK SCREEN ---
   if (!isUnlocked) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-gray-900 dark:to-gray-950 p-4 transition-colors">
@@ -233,52 +287,51 @@ export default function Presupuesto() {
           >
             {creandoPin ? 'CREAR PIN' : 'ENTRAR'}
           </button>
+          {!creandoPin && (
+            <button
+              onClick={olvidarPin}
+              className="mt-6 text-sm text-gray-400 hover:text-red-500 transition underline"
+            >
+              ¿Olvidaste tu PIN?
+            </button>
+          )}
         </div>
-
-        {/* Footer dinámico */}
         <footer className="text-center py-6 text-sm text-gray-500 dark:text-gray-400 mt-auto">
           <p>FinanzaPro © {currentYear}</p>
           <p className="text-xs mt-1 opacity-70">
-            Tus datos seguros en tu dispositivo
+            Datos seguros en tu dispositivo
           </p>
         </footer>
       </div>
     );
   }
 
-  // --- CÁLCULOS ---
+  // --- APP ---
   const totalGastado = gastos.reduce(
     (acc, g) => acc + (Number(g.costo) || 0),
     0,
   );
   const restante = salario - totalGastado;
   const porcentaje = salario > 0 ? (totalGastado / salario) * 100 : 0;
-
   let colorBarra = 'bg-emerald-500';
   if (porcentaje > 50) colorBarra = 'bg-amber-500';
   if (porcentaje > 80) colorBarra = 'bg-rose-500';
 
-  // --- APP PRINCIPAL ---
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 transition-colors duration-300 flex flex-col">
-      {/* CABECERA */}
       <header className="bg-white dark:bg-gray-800 shadow-sm border-b dark:border-gray-700">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3 text-2xl font-bold text-indigo-600 dark:text-indigo-400">
             <span>💰</span> <span>FinanzaPro</span>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={toggleDarkMode}
-              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition text-2xl"
-            >
-              {isDark ? '☀️' : '🌙'}
-            </button>
-          </div>
+          <button
+            onClick={toggleDarkMode}
+            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition text-2xl"
+          >
+            {isDark ? '☀️' : '🌙'}
+          </button>
         </div>
       </header>
-
-      {/* CONTENIDO */}
       <main className="flex-1 container mx-auto p-4 pb-24 md:pb-4">
         {salario === 0 ? (
           <div className="flex flex-col items-center justify-center h-full min-h-[70vh]">
@@ -345,7 +398,6 @@ export default function Presupuesto() {
                 />
               </div>
             </aside>
-
             <div className="lg:hidden bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-lg border dark:border-gray-700 mb-4">
               <div className="flex flex-col items-center">
                 <p className="text-gray-500 text-sm">Te queda</p>
@@ -362,14 +414,22 @@ export default function Presupuesto() {
                 </div>
               </div>
             </div>
-
             <section className="lg:col-span-8">
               <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-lg border dark:border-gray-700 overflow-hidden">
                 <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
                   <h3 className="font-bold text-xl dark:text-white">
                     Mis Compras
                   </h3>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 items-center">
+                    {/* BOTÓN DESCARGAR PDF */}
+                    {gastos.length > 0 && (
+                      <button
+                        onClick={generarPDF}
+                        className="flex items-center gap-1 text-xs bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 px-3 py-1.5 rounded-full font-bold hover:bg-green-200 transition"
+                      >
+                        📄 PDF
+                      </button>
+                    )}
                     <button
                       onClick={() => setIsUnlocked(false)}
                       className="text-xs bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full"
@@ -430,8 +490,6 @@ export default function Presupuesto() {
           </div>
         )}
       </main>
-
-      {/* FOOTER DINÁMICO */}
       <footer className="bg-white dark:bg-gray-800 border-t dark:border-gray-700 mt-auto py-6">
         <div className="container mx-auto px-4 text-center">
           <div className="flex justify-center gap-4 text-3xl mb-3">
@@ -445,15 +503,11 @@ export default function Presupuesto() {
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Tus finanzas seguras en tu bolsillo.
           </p>
-          {/* Aquí usamos la variable currentYear */}
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-            © {currentYear} Todos los derechos reservados. Datos encriptados
-            localmente.
+            © {currentYear} Todos los derechos reservados.
           </p>
         </div>
       </footer>
-
-      {/* BOTÓN FLOTANTE */}
       {salario > 0 && (
         <button
           onClick={() => setIsModalOpen(true)}
@@ -462,8 +516,6 @@ export default function Presupuesto() {
           +
         </button>
       )}
-
-      {/* MODAL */}
       {isModalOpen && (
         <div
           className="lg:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end"
@@ -496,11 +548,7 @@ export default function Presupuesto() {
           </div>
         </div>
       )}
-
-      <style>{`
-            @keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
-            .animate-slide-up { animation: slide-up 0.3s ease-out; }
-        `}</style>
+      <style>{`@keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } } .animate-slide-up { animation: slide-up 0.3s ease-out; }`}</style>
     </div>
   );
 }
