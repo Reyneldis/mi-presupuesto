@@ -108,7 +108,7 @@ export default function Presupuesto() {
   // Pantalla de Seguridad (Bloqueo) - Se muestra si NO está desbloqueado
   if (!isUnlocked) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-indigo-100 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-b from-blue-50 to-indigo-100 p-4">
         <div className="bg-white p-8 rounded-2xl shadow-xl text-center w-full max-w-sm space-y-6">
           <div className="text-6xl">🔐</div>
           <h2 className="text-2xl font-bold text-gray-700">
