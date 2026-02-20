@@ -14,28 +14,25 @@ const { title } = Astro.props;
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- Favicon (el que arreglamos antes) -->
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Script para evitar el flash blanco al cargar -->
+    <script is:inline>
+      const theme = localStorage.getItem('theme');
+      if (
+        theme === 'dark' ||
+        (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)
+      ) {
+        document.documentElement.classList.add('dark');
+      }
+    </script>
 
-    <!-- SEO y Redes Sociales -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta
       name="description"
-      content="Gestiona tu salario, controla tus gastos mensuales y ahorra dinero de forma inteligente."
+      content="Gestiona tu salario, controla tus gastos mensuales y ahorra dinero."
     />
-    <meta name="author" content="Reyneldis" />
-
-    <!-- Color de tema para móviles (barra superior azul) -->
     <meta name="theme-color" content="#4f46e5" />
 
-    <!-- Open Graph (para cuando compartas el link) -->
-    <meta property="og:title" content="Mi Presupuesto Personal" />
-    <meta
-      property="og:description"
-      content="Tu gestor de finanzas personal y seguro."
-    />
-    <meta property="og:type" content="website" />
-
-    <!-- Fuente Profesional (Inter) -->
+    <!-- Fuente Profesional -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -45,19 +42,14 @@ const { title } = Astro.props;
 
     <title>{title}</title>
   </head>
-  <body class="bg-slate-100 font-sans antialiased">
+  <body class="bg-slate-100 dark:bg-gray-900 transition-colors duration-300">
     <slot />
   </body>
 </html>
 
 <style is:global>
-  /* Aplicamos la fuente Inter a todo */
   html {
     font-family: 'Inter', system-ui, sans-serif;
-  }
-
-  /* Animación suave para el scroll */
-  html {
     scroll-behavior: smooth;
   }
 </style>

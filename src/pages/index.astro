@@ -3,19 +3,9 @@ import Layout from '../layouts/Layout.astro';
 import Presupuesto from '../components/Presupuesto';
 ---
 
-<Layout title="💰 Mi Presupuesto Personal">
-  <main
-    class="min-h-screen bg-linear-to-b from-slate-50 to-indigo-50 py-10 px-4"
-  >
-    <!-- Contenedor principal -->
-    <div class="w-full">
-      <Presupuesto client:only="react" />
-    </div>
-
-    <!-- Footer Profesional -->
-    <footer class="text-center mt-12 pb-6 text-sm text-gray-400">
-      <p>Hecho con ❤️ para controlar tus finanzas.</p>
-      <p class="mt-1">Seguro · Privado · Sin anuncios</p>
-    </footer>
+<Layout title="Mi Finanza Pro | Gestión Inteligente">
+  <!-- Eliminamos padding extra para que el componente controle el layout -->
+  <main class="min-h-screen w-full">
+    <Presupuesto client:only="react" />
   </main>
 </Layout>
