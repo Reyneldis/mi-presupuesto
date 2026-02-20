@@ -2,31 +2,97 @@
 import { useState } from 'react';
 
 export default function Presupuesto() {
-  // Inicializamos el estado leyendo directamente de localStorage
-  // Al usar client:only, esto se ejecuta solo en el navegador y es seguro
-  const [salario, setSalario] = useState(() => {
-    const saved = localStorage.getItem('salario');
-    return saved ? Number(saved) : 0;
-  });
+  // --- SEGURIDAD ---
+  const [pinGuardado, setPinGuardado] = useState(
+    () => localStorage.getItem('app_pin') || null,
+  );
+  const [pinInput, setPinInput] = useState('');
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [errorPin, setErrorPin] = useState(false);
+  const [creandoPin, setCreandoPin] = useState(
+    !localStorage.getItem('app_pin'),
+  ); // Si no hay pin, pedir crearlo
 
-  const [gastos, setGastos] = useState(() => {
-    const saved = localStorage.getItem('gastos');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const verificarPin = () => {
+    if (pinInput === pinGuardado) {
+      setIsUnlocked(true);
+      setErrorPin(false);
+    } else {
+      setErrorPin(true);
+    }
+  };
 
-  // Estados del formulario
+  const crearPin = () => {
+    if (pinInput.length >= 4) {
+      localStorage.setItem('app_pin', pinInput);
+      setPinGuardado(pinInput);
+      setIsUnlocked(true);
+      setCreandoPin(false);
+    } else {
+      alert('El PIN debe tener al menos 4 números');
+    }
+  };
+
+  // Pantalla de Seguridad (Bloqueo)
+  if (!isUnlocked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-indigo-100 p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-xl text-center w-full max-w-sm space-y-6">
+          <div className="text-6xl">🔐</div>
+          <h2 className="text-2xl font-bold text-gray-700">
+            {creandoPin ? 'Crea tu PIN de Seguridad' : 'Ingresa tu PIN'}
+          </h2>
+
+          <input
+            type="password"
+            inputMode="numeric"
+            maxLength="6"
+            placeholder="****"
+            value={pinInput}
+            onChange={e => setPinInput(e.target.value.replace(/\D/g, ''))} // Solo números
+            className="w-full text-center text-3xl tracking-widest p-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+          />
+
+          {errorPin && (
+            <p className="text-red-500 font-bold text-sm">❌ PIN incorrecto</p>
+          )}
+
+          <button
+            onClick={creandoPin ? crearPin : verificarPin}
+            className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition"
+          >
+            {creandoPin ? 'Guardar PIN' : 'Desbloquear'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --- APP PRINCIPAL (Solo visible si isUnlocked es true) ---
+
+  const leerStorage = (clave, valorPorDefecto) => {
+    try {
+      const guardado = localStorage.getItem(clave);
+      return guardado ? JSON.parse(guardado) : valorPorDefecto;
+    } catch (e) {
+      return valorPorDefecto;
+    }
+  };
+
+  const [salario, setSalario] = useState(() => leerStorage('salario', 0));
+  const [gastos, setGastos] = useState(() => leerStorage('gastos', []));
+
   const [inputSalario, setInputSalario] = useState('');
   const [nombreGasto, setNombreGasto] = useState('');
   const [peso, setPeso] = useState('');
   const [unidad, setUnidad] = useState('lbs');
   const [costo, setCosto] = useState('');
 
-  // Funciones
   const guardarSalario = () => {
     const numero = Number(inputSalario);
     if (numero > 0) {
       setSalario(numero);
-      localStorage.setItem('salario', numero);
+      localStorage.setItem('salario', String(numero));
       setInputSalario('');
     }
   };
@@ -34,20 +100,16 @@ export default function Presupuesto() {
   const agregarGasto = e => {
     e.preventDefault();
     if (!nombreGasto || !costo) return;
-
     const nuevoGasto = {
       id: Date.now(),
       nombre: nombreGasto,
-      peso: peso,
-      unidad: unidad,
+      peso,
+      unidad,
       costo: Number(costo),
     };
-
     const nuevosGastos = [...gastos, nuevoGasto];
     setGastos(nuevosGastos);
     localStorage.setItem('gastos', JSON.stringify(nuevosGastos));
-
-    // Limpiar formulario
     setNombreGasto('');
     setPeso('');
     setCosto('');
@@ -60,20 +122,39 @@ export default function Presupuesto() {
     localStorage.setItem('gastos', JSON.stringify(nuevosGastos));
   };
 
-  // Cálculos
-  const totalGastado = gastos.reduce((acc, g) => acc + g.costo, 0);
-  const restante = salario - totalGastado;
+  const reiniciarApp = () => {
+    if (window.confirm('¿Seguro que quieres borrar TODO y empezar de nuevo?')) {
+      localStorage.clear();
+      setSalario(0);
+      setGastos([]);
+      setIsUnlocked(false); // Regresa al login
+      setPinGuardado(null); // Borra el pin
+    }
+  };
 
+  const totalGastado = gastos.reduce(
+    (acc, g) => acc + (Number(g.costo) || 0),
+    0,
+  );
+  const restante = salario - totalGastado;
   const porcentaje = salario > 0 ? (totalGastado / salario) * 100 : 0;
+
   let colorBarra = 'bg-green-500';
   if (porcentaje > 50) colorBarra = 'bg-yellow-500';
   if (porcentaje > 80) colorBarra = 'bg-red-500';
 
   return (
-    <div className="max-w-lg mx-auto p-6 bg-white rounded-xl shadow-md space-y-6 font-sans">
-      {/* Pantalla para definir salario si es 0 */}
+    <div className="max-w-lg mx-auto p-6 bg-white rounded-xl shadow-md space-y-6 font-sans relative">
+      {/* Botón Cerrar Sesión */}
+      <button
+        onClick={() => setIsUnlocked(false)}
+        className="absolute top-4 right-4 text-xs bg-gray-200 text-gray-600 px-3 py-1 rounded-full hover:bg-gray-300 transition"
+      >
+        🔒 Bloquear
+      </button>
+
       {salario === 0 ? (
-        <div className="text-center space-y-4">
+        <div className="text-center space-y-4 pt-8">
           <h2 className="text-2xl font-bold text-gray-700">
             ¿Cuánto cobras este mes?
           </h2>
@@ -94,9 +175,7 @@ export default function Presupuesto() {
           </div>
         </div>
       ) : (
-        /* Dashboard principal */
         <>
-          {/* Header Saldo */}
           <div className="text-center border-b pb-4">
             <p className="text-gray-500 uppercase tracking-wider text-sm">
               Salario Mensual
@@ -106,7 +185,6 @@ export default function Presupuesto() {
             </h1>
           </div>
 
-          {/* Barra de Progreso */}
           <div className="space-y-2">
             <div className="flex justify-between text-sm font-medium">
               <span>Gastado: ${totalGastado.toLocaleString('es-ES')}</span>
@@ -129,22 +207,19 @@ export default function Presupuesto() {
             )}
           </div>
 
-          {/* Formulario Agregar Gasto */}
           <form
             onSubmit={agregarGasto}
             className="space-y-3 bg-gray-50 p-4 rounded-lg border"
           >
             <h3 className="font-bold text-lg text-gray-700">Agregar Compra</h3>
-
             <input
               type="text"
-              placeholder="Producto (Ej: Arroz, Aceite)"
+              placeholder="Producto (Ej: Arroz)"
               value={nombreGasto}
               onChange={e => setNombreGasto(e.target.value)}
               className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
               required
             />
-
             <div className="flex gap-2">
               <input
                 type="number"
@@ -158,13 +233,12 @@ export default function Presupuesto() {
                 onChange={e => setUnidad(e.target.value)}
                 className="w-1/2 p-2 border rounded bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
               >
-                <option value="lbs">Libras (lbs)</option>
-                <option value="kgs">Kilos (kgs)</option>
+                <option value="lbs">Libras</option>
+                <option value="kgs">Kilos</option>
                 <option value="unidades">Unidades</option>
                 <option value="litros">Litros</option>
               </select>
             </div>
-
             <input
               type="number"
               placeholder="Costo Total ($)"
@@ -173,7 +247,6 @@ export default function Presupuesto() {
               className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
               required
             />
-
             <button
               type="submit"
               className="w-full bg-indigo-600 text-white p-2 rounded font-bold hover:bg-indigo-700 transition"
@@ -182,7 +255,6 @@ export default function Presupuesto() {
             </button>
           </form>
 
-          {/* Lista de Gastos */}
           <div className="space-y-2">
             {gastos.map(gasto => (
               <div
@@ -199,7 +271,7 @@ export default function Presupuesto() {
                 </div>
                 <div className="flex items-center gap-2">
                   <p className="text-red-500 font-bold">
-                    -${gasto.costo.toLocaleString('es-ES')}
+                    -${(Number(gasto.costo) || 0).toLocaleString('es-ES')}
                   </p>
                   <button
                     type="button"
@@ -213,18 +285,11 @@ export default function Presupuesto() {
             ))}
           </div>
 
-          {/* Botón Reiniciar */}
           <button
-            onClick={() => {
-              if (window.confirm('¿Ya empezó un nuevo mes? ¿Borramos todo?')) {
-                localStorage.clear();
-                setSalario(0);
-                setGastos([]);
-              }
-            }}
+            onClick={reiniciarApp}
             className="w-full text-gray-400 text-sm hover:text-gray-600 underline mt-8"
           >
-            Reiniciar mes
+            Reiniciar App y Borrar Datos
           </button>
         </>
       )}
