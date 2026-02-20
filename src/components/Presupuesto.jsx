@@ -2,7 +2,19 @@
 import { useState } from 'react';
 
 export default function Presupuesto() {
-  // --- SEGURIDAD ---
+  // --- 1. FUNCIONES AUXILIARES ---
+  const leerStorage = (clave, valorPorDefecto) => {
+    try {
+      const guardado = localStorage.getItem(clave);
+      return guardado ? JSON.parse(guardado) : valorPorDefecto;
+    } catch (e) {
+      return valorPorDefecto;
+    }
+  };
+
+  // --- 2. TODOS LOS ESTADOS AL PRINCIPIO (Corrige el error) ---
+
+  // Estados de Seguridad
   const [pinGuardado, setPinGuardado] = useState(
     () => localStorage.getItem('app_pin') || null,
   );
@@ -11,7 +23,20 @@ export default function Presupuesto() {
   const [errorPin, setErrorPin] = useState(false);
   const [creandoPin, setCreandoPin] = useState(
     !localStorage.getItem('app_pin'),
-  ); // Si no hay pin, pedir crearlo
+  );
+
+  // Estados de la App
+  const [salario, setSalario] = useState(() => leerStorage('salario', 0));
+  const [gastos, setGastos] = useState(() => leerStorage('gastos', []));
+  const [inputSalario, setInputSalario] = useState('');
+
+  // Estados del Formulario
+  const [nombreGasto, setNombreGasto] = useState('');
+  const [peso, setPeso] = useState('');
+  const [unidad, setUnidad] = useState('lbs');
+  const [costo, setCosto] = useState('');
+
+  // --- 3. FUNCIONES DE LÓGICA ---
 
   const verificarPin = () => {
     if (pinInput === pinGuardado) {
@@ -32,61 +57,6 @@ export default function Presupuesto() {
       alert('El PIN debe tener al menos 4 números');
     }
   };
-
-  // Pantalla de Seguridad (Bloqueo)
-  if (!isUnlocked) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-indigo-100 p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-xl text-center w-full max-w-sm space-y-6">
-          <div className="text-6xl">🔐</div>
-          <h2 className="text-2xl font-bold text-gray-700">
-            {creandoPin ? 'Crea tu PIN de Seguridad' : 'Ingresa tu PIN'}
-          </h2>
-
-          <input
-            type="password"
-            inputMode="numeric"
-            maxLength="6"
-            placeholder="****"
-            value={pinInput}
-            onChange={e => setPinInput(e.target.value.replace(/\D/g, ''))} // Solo números
-            className="w-full text-center text-3xl tracking-widest p-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-          />
-
-          {errorPin && (
-            <p className="text-red-500 font-bold text-sm">❌ PIN incorrecto</p>
-          )}
-
-          <button
-            onClick={creandoPin ? crearPin : verificarPin}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition"
-          >
-            {creandoPin ? 'Guardar PIN' : 'Desbloquear'}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // --- APP PRINCIPAL (Solo visible si isUnlocked es true) ---
-
-  const leerStorage = (clave, valorPorDefecto) => {
-    try {
-      const guardado = localStorage.getItem(clave);
-      return guardado ? JSON.parse(guardado) : valorPorDefecto;
-    } catch (e) {
-      return valorPorDefecto;
-    }
-  };
-
-  const [salario, setSalario] = useState(() => leerStorage('salario', 0));
-  const [gastos, setGastos] = useState(() => leerStorage('gastos', []));
-
-  const [inputSalario, setInputSalario] = useState('');
-  const [nombreGasto, setNombreGasto] = useState('');
-  const [peso, setPeso] = useState('');
-  const [unidad, setUnidad] = useState('lbs');
-  const [costo, setCosto] = useState('');
 
   const guardarSalario = () => {
     const numero = Number(inputSalario);
@@ -127,11 +97,50 @@ export default function Presupuesto() {
       localStorage.clear();
       setSalario(0);
       setGastos([]);
-      setIsUnlocked(false); // Regresa al login
-      setPinGuardado(null); // Borra el pin
+      setIsUnlocked(false);
+      setPinGuardado(null);
+      setCreandoPin(true); // Reinicia al estado de crear PIN
     }
   };
 
+  // --- 4. RENDERIZADO ---
+
+  // Pantalla de Seguridad (Bloqueo) - Se muestra si NO está desbloqueado
+  if (!isUnlocked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-indigo-100 p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-xl text-center w-full max-w-sm space-y-6">
+          <div className="text-6xl">🔐</div>
+          <h2 className="text-2xl font-bold text-gray-700">
+            {creandoPin ? 'Crea tu PIN de Seguridad' : 'Ingresa tu PIN'}
+          </h2>
+
+          <input
+            type="password"
+            inputMode="numeric"
+            maxLength="6"
+            placeholder="****"
+            value={pinInput}
+            onChange={e => setPinInput(e.target.value.replace(/\D/g, ''))}
+            className="w-full text-center text-3xl tracking-widest p-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+          />
+
+          {errorPin && (
+            <p className="text-red-500 font-bold text-sm">❌ PIN incorrecto</p>
+          )}
+
+          <button
+            onClick={creandoPin ? crearPin : verificarPin}
+            className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition"
+          >
+            {creandoPin ? 'Guardar PIN' : 'Desbloquear'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Pantalla Principal (App) - Se muestra si SÍ está desbloqueado
   const totalGastado = gastos.reduce(
     (acc, g) => acc + (Number(g.costo) || 0),
     0,
