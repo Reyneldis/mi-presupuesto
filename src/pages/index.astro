@@ -1,0 +1,16 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Presupuesto from '../components/Presupuesto';
+---
+
+<Layout title="Mi Gestor de Salario">
+  <main
+    class="min-h-screen bg-linear-to-b from-blue-50 to-indigo-100 py-10 px-4"
+  >
+    <h1 class="text-3xl font-bold text-center mb-8 text-gray-800">
+      💰 Control de Gastos
+    </h1>
+    <!-- Cambiamos client:load por client:only="react" -->
+    <Presupuesto client:only="react" />
+  </main>
+</Layout>
