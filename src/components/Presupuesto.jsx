@@ -1,11 +1,219 @@
 // src/components/Presupuesto.jsx
 import { useState, useEffect } from 'react';
 import sha256 from 'crypto-js/sha256';
-// IMPORTACIÓN CORREGIDA PARA PDF (Forma directa)
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-// --- FORMULARIO ---
+// --- COMPONENTE CALCULADORA (INTEGRADA) ---
+const Calculadora = ({ onUseResult, onClose }) => {
+  const [display, setDisplay] = useState('0');
+  const [prevValue, setPrevValue] = useState(null);
+  const [operator, setOperator] = useState(null);
+  const [waitingForOperand, setWaitingForOperand] = useState(false);
+
+  const inputDigit = digit => {
+    if (waitingForOperand) {
+      setDisplay(digit);
+      setWaitingForOperand(false);
+    } else {
+      setDisplay(display === '0' ? digit : display + digit);
+    }
+  };
+
+  const inputDot = () => {
+    if (waitingForOperand) {
+      setDisplay('0.');
+      setWaitingForOperand(false);
+    } else if (!display.includes('.')) {
+      setDisplay(display + '.');
+    }
+  };
+
+  const clear = () => {
+    setDisplay('0');
+    setPrevValue(null);
+    setOperator(null);
+    setWaitingForOperand(false);
+  };
+
+  const performOperation = nextOperator => {
+    const inputValue = parseFloat(display);
+    if (prevValue === null) {
+      setPrevValue(inputValue);
+    } else if (operator) {
+      const currentValue = prevValue || 0;
+      let newValue;
+      switch (operator) {
+        case '+':
+          newValue = currentValue + inputValue;
+          break;
+        case '-':
+          newValue = currentValue - inputValue;
+          break;
+        case '×':
+          newValue = currentValue * inputValue;
+          break;
+        case '÷':
+          newValue = currentValue / inputValue;
+          break;
+        default:
+          return;
+      }
+      setDisplay(String(newValue));
+      setPrevValue(newValue);
+    }
+    setWaitingForOperand(true);
+    setOperator(nextOperator);
+  };
+
+  const calculate = () => {
+    if (!operator || prevValue === null) return;
+    performOperation(null);
+    setOperator(null);
+    setPrevValue(null);
+  };
+
+  const handleUseResult = () => {
+    onUseResult(display);
+    onClose();
+  };
+
+  const Button = ({ label, onClick, className = '' }) => (
+    <button
+      onClick={onClick}
+      className={`p-3 text-xl font-semibold rounded-xl transition-all active:scale-95 flex items-center justify-center ${className}`}
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <div className="bg-gray-100 dark:bg-gray-900 p-4 rounded-b-2xl">
+      {/* Pantalla Calc */}
+      <div className="bg-white dark:bg-gray-800 p-4 rounded-xl mb-3 text-right shadow-inner border dark:border-gray-700">
+        <div className="text-gray-400 text-xs h-4">
+          {prevValue !== null ? `${prevValue} ${operator || ''}` : ' '}
+        </div>
+        <div className="text-3xl font-bold text-gray-800 dark:text-white truncate">
+          {display}
+        </div>
+      </div>
+
+      {/* Teclado */}
+      <div className="grid grid-cols-4 gap-2">
+        <Button
+          label="C"
+          onClick={clear}
+          className="bg-rose-100 text-rose-600 dark:bg-rose-900/30"
+        />
+        <Button
+          label="±"
+          onClick={() => setDisplay(String(-parseFloat(display)))}
+          className="bg-gray-200 dark:bg-gray-700"
+        />
+        <Button
+          label="%"
+          onClick={() => setDisplay(String(parseFloat(display) / 100))}
+          className="bg-gray-200 dark:bg-gray-700"
+        />
+        <Button
+          label="÷"
+          onClick={() => performOperation('÷')}
+          className="bg-indigo-500 text-white"
+        />
+
+        <Button
+          label="7"
+          onClick={() => inputDigit('7')}
+          className="bg-white dark:bg-gray-800 shadow-sm"
+        />
+        <Button
+          label="8"
+          onClick={() => inputDigit('8')}
+          className="bg-white dark:bg-gray-800 shadow-sm"
+        />
+        <Button
+          label="9"
+          onClick={() => inputDigit('9')}
+          className="bg-white dark:bg-gray-800 shadow-sm"
+        />
+        <Button
+          label="×"
+          onClick={() => performOperation('×')}
+          className="bg-indigo-500 text-white"
+        />
+
+        <Button
+          label="4"
+          onClick={() => inputDigit('4')}
+          className="bg-white dark:bg-gray-800 shadow-sm"
+        />
+        <Button
+          label="5"
+          onClick={() => inputDigit('5')}
+          className="bg-white dark:bg-gray-800 shadow-sm"
+        />
+        <Button
+          label="6"
+          onClick={() => inputDigit('6')}
+          className="bg-white dark:bg-gray-800 shadow-sm"
+        />
+        <Button
+          label="-"
+          onClick={() => performOperation('-')}
+          className="bg-indigo-500 text-white"
+        />
+
+        <Button
+          label="1"
+          onClick={() => inputDigit('1')}
+          className="bg-white dark:bg-gray-800 shadow-sm"
+        />
+        <Button
+          label="2"
+          onClick={() => inputDigit('2')}
+          className="bg-white dark:bg-gray-800 shadow-sm"
+        />
+        <Button
+          label="3"
+          onClick={() => inputDigit('3')}
+          className="bg-white dark:bg-gray-800 shadow-sm"
+        />
+        <Button
+          label="+"
+          onClick={() => performOperation('+')}
+          className="bg-indigo-500 text-white"
+        />
+
+        <Button
+          label="0"
+          onClick={() => inputDigit('0')}
+          className="bg-white dark:bg-gray-800 shadow-sm col-span-2"
+        />
+        <Button
+          label="."
+          onClick={inputDot}
+          className="bg-white dark:bg-gray-800 shadow-sm"
+        />
+        <Button
+          label="="
+          onClick={calculate}
+          className="bg-green-500 text-white"
+        />
+      </div>
+
+      {/* BOTÓN USAR VALOR */}
+      <button
+        onClick={handleUseResult}
+        className="w-full mt-3 bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition flex items-center justify-center gap-2 shadow-lg"
+      >
+        ✅ Usar este valor (${display})
+      </button>
+    </div>
+  );
+};
+
+// --- FORMULARIO GASTO (CON CALCULADORA) ---
 const FormularioGasto = ({
   nombreGasto,
   setNombreGasto,
@@ -16,68 +224,98 @@ const FormularioGasto = ({
   costo,
   setCosto,
   agregarGasto,
-}) => (
-  <form
-    onSubmit={agregarGasto}
-    className="space-y-4 p-6 bg-white dark:bg-gray-800"
-  >
-    <div className="text-center mb-4">
-      <span className="text-4xl">🛒</span>
-      <h3 className="font-bold text-xl dark:text-white mt-2">
-        ¿Qué compraste?
-      </h3>
+}) => {
+  const [showCalc, setShowCalc] = useState(false);
+
+  return (
+    <div className="p-6 bg-white dark:bg-gray-800">
+      <div className="text-center mb-4">
+        <span className="text-4xl">🛒</span>
+        <h3 className="font-bold text-xl dark:text-white mt-2">
+          ¿Qué compraste?
+        </h3>
+      </div>
+
+      <form onSubmit={agregarGasto} className="space-y-4">
+        <input
+          type="text"
+          placeholder="Ej: Arroz, Aceite..."
+          value={nombreGasto}
+          onChange={e => setNombreGasto(e.target.value)}
+          className="w-full p-4 text-lg bg-gray-50 dark:bg-gray-700 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-300 dark:text-white transition"
+          required
+        />
+
+        <div className="flex gap-2">
+          <input
+            type="number"
+            placeholder="Cant."
+            value={peso}
+            onChange={e => setPeso(e.target.value)}
+            className="w-1/3 p-4 text-center text-lg bg-gray-50 dark:bg-gray-700 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-300 dark:text-white"
+          />
+          <select
+            value={unidad}
+            onChange={e => setUnidad(e.target.value)}
+            className="w-1/3 p-4 text-center text-lg bg-gray-50 dark:bg-gray-700 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-300 dark:text-white appearance-none"
+          >
+            <option value="lbs">Lbs</option>
+            <option value="kgs">Kgs</option>
+            <option value="unidades">Uds</option>
+            <option value="litros">Lts</option>
+            <option value="ml">Ml</option>
+          </select>
+
+          {/* INPUT DE COSTO CON BOTÓN CALCULADORA */}
+          <div className="w-1/3 relative">
+            <input
+              type="number"
+              placeholder="$$"
+              value={costo}
+              onChange={e => setCosto(e.target.value)}
+              className="w-full p-4 text-center text-lg bg-gray-50 dark:bg-gray-700 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-300 dark:text-white font-bold pr-10"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowCalc(!showCalc)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-xl p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition"
+            >
+              {showCalc ? '✖️' : '🧮'}
+            </button>
+          </div>
+        </div>
+
+        {/* CALCULADORA DE PLENO DERECHO SI ESTÁ ACTIVA */}
+        {showCalc && (
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
+            <Calculadora
+              onUseResult={val => setCosto(val)}
+              onClose={() => setShowCalc(false)}
+            />
+          </div>
+        )}
+
+        {/* OCULTAR BOTÓN GUARDAR SI LA CALC ESTÁ ABIERTA PARA NO CONFUNDIR */}
+        {!showCalc && (
+          <button
+            type="submit"
+            className="w-full bg-indigo-600 text-white p-5 text-xl rounded-2xl font-bold hover:bg-indigo-700 transition shadow-lg active:scale-95 mt-4"
+          >
+            GUARDAR GASTO
+          </button>
+        )}
+      </form>
     </div>
-    <input
-      type="text"
-      placeholder="Ej: Arroz, Aceite..."
-      value={nombreGasto}
-      onChange={e => setNombreGasto(e.target.value)}
-      className="w-full p-4 text-lg bg-gray-50 dark:bg-gray-700 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-300 dark:text-white transition"
-      required
-    />
-    <div className="grid grid-cols-3 gap-2">
-      <input
-        type="number"
-        placeholder="Cant."
-        value={peso}
-        onChange={e => setPeso(e.target.value)}
-        className="p-4 text-center text-lg bg-gray-50 dark:bg-gray-700 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-300 dark:text-white"
-      />
-      <select
-        value={unidad}
-        onChange={e => setUnidad(e.target.value)}
-        className="p-4 text-center text-lg bg-gray-50 dark:bg-gray-700 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-300 dark:text-white appearance-none"
-      >
-        <option value="lbs">Lbs</option>
-        <option value="kgs">Kgs</option>
-        <option value="unidades">Uds</option>
-        <option value="litros">Lts</option>
-        <option value="ml">Ml</option>
-      </select>
-      <input
-        type="number"
-        placeholder="$$"
-        value={costo}
-        onChange={e => setCosto(e.target.value)}
-        className="p-4 text-center text-lg bg-gray-50 dark:bg-gray-700 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-300 dark:text-white font-bold"
-        required
-      />
-    </div>
-    <button
-      type="submit"
-      className="w-full bg-indigo-600 text-white p-5 text-xl rounded-2xl font-bold hover:bg-indigo-700 transition shadow-lg active:scale-95 mt-4"
-    >
-      GUARDAR
-    </button>
-  </form>
-);
+  );
+};
 
 // --- MAIN ---
 export default function Presupuesto() {
   const currentYear = new Date().getFullYear();
   const [isDark, setIsDark] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [periodo, setPeriodo] = useState('mes'); // 'mes', 'semana', 'todo'
+  const [periodo, setPeriodo] = useState('mes');
 
   useEffect(() => {
     if (document.documentElement.classList.contains('dark')) setIsDark(true);
@@ -116,9 +354,7 @@ export default function Presupuesto() {
   const [costo, setCosto] = useState('');
 
   const olvidarPin = () => {
-    if (
-      window.confirm('⚠️ Se borrarán todos los datos para recuperar el acceso.')
-    ) {
+    if (window.confirm('⚠️ Se borrarán todos los datos.')) {
       localStorage.clear();
       setPinGuardado(null);
       setCreandoPin(true);
@@ -189,22 +425,18 @@ export default function Presupuesto() {
     }
   };
 
-  // --- FILTRO DE FECHAS ---
   const gastosFiltrados = gastos.filter(g => {
     if (periodo === 'todo') return true;
     const fechaGasto = new Date(g.id);
     const ahora = new Date();
-
-    if (periodo === 'mes') {
+    if (periodo === 'mes')
       return (
         fechaGasto.getMonth() === ahora.getMonth() &&
         fechaGasto.getFullYear() === ahora.getFullYear()
       );
-    }
     if (periodo === 'semana') {
-      // Obtener inicio de semana (Lunes)
-      const diaSemana = ahora.getDay(); // 0 (Dom) - 6 (Sab)
-      const diff = ahora.getDate() - diaSemana + (diaSemana === 0 ? -6 : 1); // Ajuste para empezar en Lunes
+      const diaSemana = ahora.getDay();
+      const diff = ahora.getDate() - diaSemana + (diaSemana === 0 ? -6 : 1);
       const inicioSemana = new Date(ahora.setDate(diff));
       inicioSemana.setHours(0, 0, 0, 0);
       return fechaGasto >= inicioSemana;
@@ -217,22 +449,15 @@ export default function Presupuesto() {
     0,
   );
 
-  // --- FUNCIÓN PDF (SINTAXIS CORREGIDA) ---
   const generarPDF = () => {
     try {
       const doc = new jsPDF();
-
-      // Título
       doc.setFontSize(22);
       doc.setTextColor(79, 70, 229);
       doc.text('FinanzaPro - Resumen', 14, 22);
-
-      // Fecha
       doc.setFontSize(10);
       doc.setTextColor(100);
       doc.text(`Generado: ${new Date().toLocaleDateString('es-ES')}`, 14, 30);
-
-      // Resumen
       doc.setFontSize(12);
       doc.setTextColor(0);
       doc.text(`Salario: $${salario.toLocaleString('es-ES')}`, 14, 45);
@@ -246,8 +471,6 @@ export default function Presupuesto() {
         14,
         59,
       );
-
-      // Tabla - USANDO LA NUEVA SINTAXIS
       autoTable(doc, {
         startY: 70,
         head: [['Producto', 'Cant.', 'Costo']],
@@ -259,18 +482,16 @@ export default function Presupuesto() {
         theme: 'grid',
         headStyles: { fillColor: [79, 70, 229] },
       });
-
       doc.save(`MisGastos.pdf`);
     } catch (error) {
       console.error(error);
-      alert('Error al generar PDF. Revisa consola.');
+      alert('Error PDF');
     }
   };
 
-  // --- LOCK SCREEN ---
   if (!isUnlocked) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-linear-to-br from-indigo-100 to-purple-100 dark:from-gray-900 dark:to-gray-950 p-4 transition-colors">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-gray-900 dark:to-gray-950 p-4 transition-colors">
         <button
           onClick={toggleDarkMode}
           className="absolute top-6 right-6 z-50 text-2xl p-2 rounded-full bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm shadow-lg hover:scale-110 transition"
@@ -321,7 +542,6 @@ export default function Presupuesto() {
     );
   }
 
-  // --- APP ---
   const totalGastado = gastos.reduce(
     (acc, g) => acc + (Number(g.costo) || 0),
     0,
@@ -374,7 +594,7 @@ export default function Presupuesto() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <aside className="hidden lg:block lg:col-span-4 space-y-6">
-              <div className="bg-linear-to-br from-indigo-600 to-purple-700 rounded-3xl p-6 text-white shadow-2xl">
+              <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-3xl p-6 text-white shadow-2xl">
                 <p className="text-indigo-200 text-sm uppercase tracking-wider">
                   Tu Salario
                 </p>
@@ -431,13 +651,10 @@ export default function Presupuesto() {
             </div>
             <section className="lg:col-span-8">
               <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-lg border dark:border-gray-700 overflow-hidden">
-                {/* Header con Filtros */}
                 <div className="p-4 border-b dark:border-gray-700 flex flex-col md:flex-row justify-between items-center gap-2">
                   <h3 className="font-bold text-xl dark:text-white">
                     Mis Compras
                   </h3>
-
-                  {/* BOTONES DE FILTRO */}
                   <div className="flex gap-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-xl text-xs">
                     <button
                       onClick={() => setPeriodo('semana')}
@@ -458,7 +675,6 @@ export default function Presupuesto() {
                       Todo
                     </button>
                   </div>
-
                   <div className="flex gap-2 items-center">
                     {gastosFiltrados.length > 0 && (
                       <button
@@ -482,15 +698,12 @@ export default function Presupuesto() {
                     </button>
                   </div>
                 </div>
-
-                {/* Resumen del periodo seleccionado */}
                 <div className="px-4 py-2 bg-gray-50 dark:bg-gray-700/30 text-sm text-gray-500 dark:text-gray-400">
                   Gastado en este periodo:{' '}
                   <span className="font-bold text-gray-700 dark:text-white">
                     ${totalGastadoFiltrado.toLocaleString('es-ES')}
                   </span>
                 </div>
-
                 <div className="divide-y dark:divide-gray-700 p-2">
                   {gastosFiltrados.length === 0 && (
                     <div className="text-center py-20 text-gray-400">
@@ -558,6 +771,7 @@ export default function Presupuesto() {
           </p>
         </div>
       </footer>
+
       {salario > 0 && (
         <button
           onClick={() => setIsModalOpen(true)}
@@ -566,17 +780,20 @@ export default function Presupuesto() {
           +
         </button>
       )}
+
       {isModalOpen && (
         <div
           className="lg:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end"
           onClick={() => setIsModalOpen(false)}
         >
           <div
-            className="w-full bg-white dark:bg-gray-800 rounded-t-4xl max-h-[90vh] overflow-y-auto animate-slide-up"
+            className="w-full bg-white dark:bg-gray-800 rounded-t-[2rem] max-h-[95vh] overflow-y-auto animate-slide-up"
             onClick={e => e.stopPropagation()}
           >
             <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center sticky top-0 bg-white dark:bg-gray-800 z-10">
-              <h3 className="font-bold text-xl dark:text-white">Agregar</h3>
+              <h3 className="font-bold text-xl dark:text-white">
+                Agregar Gasto
+              </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
                 className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 text-2xl"
@@ -584,6 +801,7 @@ export default function Presupuesto() {
                 ✖️
               </button>
             </div>
+            {/* FORMULARIO CON CALCULADORA INTEGRADA */}
             <FormularioGasto
               nombreGasto={nombreGasto}
               setNombreGasto={setNombreGasto}
@@ -598,6 +816,7 @@ export default function Presupuesto() {
           </div>
         </div>
       )}
+
       <style>{`@keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } } .animate-slide-up { animation: slide-up 0.3s ease-out; }`}</style>
     </div>
   );
