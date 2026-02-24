@@ -3,8 +3,9 @@ import { useState, useEffect } from 'react';
 import sha256 from 'crypto-js/sha256';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { z } from 'zod'; // IMPORTAMOS ZOD
 
-// --- COMPONENTE CALCULADORA (INTEGRADA) ---
+// --- COMPONENTE CALCULADORA ---
 const Calculadora = ({ onUseResult, onClose }) => {
   const [display, setDisplay] = useState('0');
   const [prevValue, setPrevValue] = useState(null);
@@ -19,7 +20,6 @@ const Calculadora = ({ onUseResult, onClose }) => {
       setDisplay(display === '0' ? digit : display + digit);
     }
   };
-
   const inputDot = () => {
     if (waitingForOperand) {
       setDisplay('0.');
@@ -28,14 +28,12 @@ const Calculadora = ({ onUseResult, onClose }) => {
       setDisplay(display + '.');
     }
   };
-
   const clear = () => {
     setDisplay('0');
     setPrevValue(null);
     setOperator(null);
     setWaitingForOperand(false);
   };
-
   const performOperation = nextOperator => {
     const inputValue = parseFloat(display);
     if (prevValue === null) {
@@ -65,14 +63,12 @@ const Calculadora = ({ onUseResult, onClose }) => {
     setWaitingForOperand(true);
     setOperator(nextOperator);
   };
-
   const calculate = () => {
     if (!operator || prevValue === null) return;
     performOperation(null);
     setOperator(null);
     setPrevValue(null);
   };
-
   const handleUseResult = () => {
     onUseResult(display);
     onClose();
@@ -89,7 +85,6 @@ const Calculadora = ({ onUseResult, onClose }) => {
 
   return (
     <div className="bg-gray-100 dark:bg-gray-900 p-4 rounded-b-2xl">
-      {/* Pantalla Calc */}
       <div className="bg-white dark:bg-gray-800 p-4 rounded-xl mb-3 text-right shadow-inner border dark:border-gray-700">
         <div className="text-gray-400 text-xs h-4">
           {prevValue !== null ? `${prevValue} ${operator || ''}` : ' '}
@@ -98,8 +93,6 @@ const Calculadora = ({ onUseResult, onClose }) => {
           {display}
         </div>
       </div>
-
-      {/* Teclado */}
       <div className="grid grid-cols-4 gap-2">
         <Button
           label="C"
@@ -121,7 +114,6 @@ const Calculadora = ({ onUseResult, onClose }) => {
           onClick={() => performOperation('÷')}
           className="bg-indigo-500 text-white"
         />
-
         <Button
           label="7"
           onClick={() => inputDigit('7')}
@@ -142,7 +134,6 @@ const Calculadora = ({ onUseResult, onClose }) => {
           onClick={() => performOperation('×')}
           className="bg-indigo-500 text-white"
         />
-
         <Button
           label="4"
           onClick={() => inputDigit('4')}
@@ -163,7 +154,6 @@ const Calculadora = ({ onUseResult, onClose }) => {
           onClick={() => performOperation('-')}
           className="bg-indigo-500 text-white"
         />
-
         <Button
           label="1"
           onClick={() => inputDigit('1')}
@@ -184,7 +174,6 @@ const Calculadora = ({ onUseResult, onClose }) => {
           onClick={() => performOperation('+')}
           className="bg-indigo-500 text-white"
         />
-
         <Button
           label="0"
           onClick={() => inputDigit('0')}
@@ -201,8 +190,6 @@ const Calculadora = ({ onUseResult, onClose }) => {
           className="bg-green-500 text-white"
         />
       </div>
-
-      {/* BOTÓN USAR VALOR */}
       <button
         onClick={handleUseResult}
         className="w-full mt-3 bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition flex items-center justify-center gap-2 shadow-lg"
@@ -213,7 +200,7 @@ const Calculadora = ({ onUseResult, onClose }) => {
   );
 };
 
-// --- FORMULARIO GASTO (CON CALCULADORA) ---
+// --- FORMULARIO GASTO (CON VALIDACIÓN ZOD) ---
 const FormularioGasto = ({
   nombreGasto,
   setNombreGasto,
@@ -226,6 +213,43 @@ const FormularioGasto = ({
   agregarGasto,
 }) => {
   const [showCalc, setShowCalc] = useState(false);
+  const [errors, setErrors] = useState({}); // Estado para errores
+
+  // Esquema de Validación con Zod
+  const GastoSchema = z.object({
+    nombre: z.string().min(1, 'El nombre es obligatorio'),
+    costo: z
+      .number({ invalid_type_error: 'El precio es obligatorio' })
+      .positive('El precio debe ser mayor a 0'),
+    peso: z.string().optional(), // Opcional
+    unidad: z.string().optional(), // Opcional
+  });
+
+  const handleSubmit = e => {
+    e.preventDefault();
+
+    // Validar antes de guardar
+    const result = GastoSchema.safeParse({
+      nombre: nombreGasto,
+      costo: Number(costo), // Convertir a número
+      peso,
+      unidad,
+    });
+
+    if (!result.success) {
+      // Si hay errores, mostrarlos
+      const fieldErrors = result.error.flatten().fieldErrors;
+      setErrors({
+        nombre: fieldErrors.nombre ? fieldErrors.nombre[0] : null,
+        costo: fieldErrors.costo ? fieldErrors.costo[0] : null,
+      });
+      return; // Detener envío
+    }
+
+    // Si todo ok, limpiar errores y enviar
+    setErrors({});
+    agregarGasto(e);
+  };
 
   return (
     <div className="p-6 bg-white dark:bg-gray-800">
@@ -236,15 +260,22 @@ const FormularioGasto = ({
         </h3>
       </div>
 
-      <form onSubmit={agregarGasto} className="space-y-4">
-        <input
-          type="text"
-          placeholder="Ej: Arroz, Aceite..."
-          value={nombreGasto}
-          onChange={e => setNombreGasto(e.target.value)}
-          className="w-full p-4 text-lg bg-gray-50 dark:bg-gray-700 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-300 dark:text-white transition"
-          required
-        />
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        {/* CAMPO NOMBRE */}
+        <div>
+          <input
+            type="text"
+            placeholder="Ej: Arroz, Aceite..."
+            value={nombreGasto}
+            onChange={e => setNombreGasto(e.target.value)}
+            className={`w-full p-4 text-lg bg-gray-50 dark:bg-gray-700 rounded-2xl focus:outline-none focus:ring-4 dark:text-white transition ${errors.nombre ? 'ring-4 ring-red-300 border-red-500' : 'focus:ring-indigo-300'}`}
+          />
+          {errors.nombre && (
+            <p className="text-red-500 text-sm mt-1 pl-2 font-medium">
+              {errors.nombre}
+            </p>
+          )}
+        </div>
 
         <div className="flex gap-2">
           <input
@@ -263,18 +294,17 @@ const FormularioGasto = ({
             <option value="kgs">Kgs</option>
             <option value="unidades">Uds</option>
             <option value="litros">Lts</option>
-            <option value="ml">Ml</option>
+            <option value="ml">Mls</option>
           </select>
 
-          {/* INPUT DE COSTO CON BOTÓN CALCULADORA */}
+          {/* CAMPO COSTO */}
           <div className="w-1/3 relative">
             <input
               type="number"
-              placeholder="$$"
+              placeholder="$"
               value={costo}
               onChange={e => setCosto(e.target.value)}
-              className="w-full p-4 text-center text-lg bg-gray-50 dark:bg-gray-700 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-300 dark:text-white font-bold pr-10"
-              required
+              className={`w-full p-4 text-center text-lg bg-gray-50 dark:bg-gray-700 rounded-2xl font-bold dark:text-white pr-10 ${errors.costo ? 'ring-4 ring-red-300 border-red-500' : ''}`}
             />
             <button
               type="button"
@@ -285,18 +315,26 @@ const FormularioGasto = ({
             </button>
           </div>
         </div>
+        {/* ERROR COSTO */}
+        {errors.costo && (
+          <p className="text-red-500 text-sm mt-1 pl-2 font-medium text-center">
+            {errors.costo}
+          </p>
+        )}
 
-        {/* CALCULADORA DE PLENO DERECHO SI ESTÁ ACTIVA */}
+        {/* CALCULADORA SI ESTÁ ACTIVA */}
         {showCalc && (
           <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
             <Calculadora
-              onUseResult={val => setCosto(val)}
+              onUseResult={val => {
+                setCosto(val);
+                setErrors({ ...errors, costo: null });
+              }}
               onClose={() => setShowCalc(false)}
             />
           </div>
         )}
 
-        {/* OCULTAR BOTÓN GUARDAR SI LA CALC ESTÁ ABIERTA PARA NO CONFUNDIR */}
         {!showCalc && (
           <button
             type="submit"
@@ -392,9 +430,10 @@ export default function Presupuesto() {
       setInputSalario('');
     }
   };
+
+  // Función agregar gasto (Se llama solo si la validación Zod pasa en el formulario)
   const agregarGasto = e => {
-    e.preventDefault();
-    if (!nombreGasto || !costo) return;
+    // e.preventDefault() ya se manejó en el hijo, pero recibimos el evento para consistencia si hace falta
     const ng = {
       id: Date.now(),
       nombre: nombreGasto,
@@ -404,11 +443,13 @@ export default function Presupuesto() {
     };
     setGastos([ng, ...gastos]);
     localStorage.setItem('gastos', JSON.stringify([ng, ...gastos]));
+    // Limpiar campos
     setNombreGasto('');
     setPeso('');
     setCosto('');
     setIsModalOpen(false);
   };
+
   const eliminarGasto = id => {
     const n = gastos.filter(g => g.id !== id);
     setGastos(n);
@@ -491,7 +532,7 @@ export default function Presupuesto() {
 
   if (!isUnlocked) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-gray-900 dark:to-gray-950 p-4 transition-colors">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-linear-to-br from-indigo-100 to-purple-100 dark:from-gray-900 dark:to-gray-950 p-4 transition-colors">
         <button
           onClick={toggleDarkMode}
           className="absolute top-6 right-6 z-50 text-2xl p-2 rounded-full bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm shadow-lg hover:scale-110 transition"
@@ -594,7 +635,7 @@ export default function Presupuesto() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <aside className="hidden lg:block lg:col-span-4 space-y-6">
-              <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-3xl p-6 text-white shadow-2xl">
+              <div className="bg-linear-to-br from-indigo-600 to-purple-700 rounded-3xl p-6 text-white shadow-2xl">
                 <p className="text-indigo-200 text-sm uppercase tracking-wider">
                   Tu Salario
                 </p>
@@ -787,7 +828,7 @@ export default function Presupuesto() {
           onClick={() => setIsModalOpen(false)}
         >
           <div
-            className="w-full bg-white dark:bg-gray-800 rounded-t-[2rem] max-h-[95vh] overflow-y-auto animate-slide-up"
+            className="w-full bg-white dark:bg-gray-800 rounded-t-4xl max-h-[95vh] overflow-y-auto animate-slide-up"
             onClick={e => e.stopPropagation()}
           >
             <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center sticky top-0 bg-white dark:bg-gray-800 z-10">
@@ -801,7 +842,6 @@ export default function Presupuesto() {
                 ✖️
               </button>
             </div>
-            {/* FORMULARIO CON CALCULADORA INTEGRADA */}
             <FormularioGasto
               nombreGasto={nombreGasto}
               setNombreGasto={setNombreGasto}
